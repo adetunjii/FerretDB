@@ -16,8 +16,10 @@ package wire
 
 import (
 	"bufio"
+	"bytes"
 	"encoding"
 	"encoding/binary"
+	"encoding/gob"
 	"errors"
 	"fmt"
 	"hash/crc32"
@@ -47,11 +49,6 @@ var ErrZeroRead = errors.New("zero bytes read")
 // Error is (possibly wrapped) ErrZeroRead if zero bytes was read.
 func ReadMessage(r *bufio.Reader) (*MsgHeader, MsgBody, error) {
 
-	reader := io.TeeReader(r)
-
-	// detach checksum
-	//
-
 	if err := verifyChecksum(r); err != nil {
 		return nil, nil, lazyerrors.Error(err)
 	}
@@ -79,6 +76,19 @@ func ReadMessage(r *bufio.Reader) (*MsgHeader, MsgBody, error) {
 		var msg OpMsg
 		if err := msg.UnmarshalBinary(b); err != nil {
 			return &header, nil, lazyerrors.Error(err)
+		}
+
+		data := new(bytes.Buffer)
+		if msg.FlagBits.FlagSet(OpMsgChecksumPresent) {
+			encoder := gob.NewEncoder(data)
+			if err := encoder.Encode(header); err != nil {
+				return &header, nil, lazyerrors.Error(err)
+			}
+
+			if err := encoder.Encode(msg); err != nil {
+				return &header, nil, lazyerrors.Error(err)
+			}
+
 		}
 
 		return &header, &msg, nil
