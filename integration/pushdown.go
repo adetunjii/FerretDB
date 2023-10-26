@@ -21,7 +21,7 @@ import (
 )
 
 // resultPushdown stores the information about expected pushdown results for a single or multiple backends.
-// For example if both pg and SQlite backends are expected to pushdown, the `pgPushdown + sqlitePushdown` operation
+// For example if both pg and SQlite backends are expected to pushdown, the `pgPushdown | sqlitePushdown` operation
 // can be used.
 type resultPushdown uint8
 
@@ -51,7 +51,7 @@ func (res resultPushdown) PushdownExpected(t testtb.TB) bool {
 	}
 
 	switch {
-	case setup.IsPostgres(t) || setup.IsOldPg(t):
+	case setup.IsPostgreSQL(t):
 		return res&pgPushdown == pgPushdown
 	case setup.IsSQLite(t):
 		return res&sqlitePushdown == sqlitePushdown

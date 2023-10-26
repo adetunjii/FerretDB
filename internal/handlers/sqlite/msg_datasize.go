@@ -85,8 +85,7 @@ func (h *Handler) MsgDataSize(ctx context.Context, msg *wire.OpMsg) (*wire.OpMsg
 	started := time.Now()
 
 	stats, err := c.Stats(ctx, new(backends.CollectionStatsParams))
-	if backends.ErrorCodeIs(err, backends.ErrorCodeDatabaseDoesNotExist) ||
-		backends.ErrorCodeIs(err, backends.ErrorCodeCollectionDoesNotExist) {
+	if backends.ErrorCodeIs(err, backends.ErrorCodeCollectionDoesNotExist) {
 		stats = new(backends.CollectionStatsResult)
 		err = nil
 	}
@@ -100,7 +99,7 @@ func (h *Handler) MsgDataSize(ctx context.Context, msg *wire.OpMsg) (*wire.OpMsg
 		Documents: []*types.Document{must.NotFail(types.NewDocument(
 			"estimate", false,
 			"size", stats.SizeTotal,
-			"numObjects", stats.CountObjects,
+			"numObjects", stats.CountDocuments,
 			"millis", int32(time.Since(started).Milliseconds()),
 			"ok", float64(1),
 		))},

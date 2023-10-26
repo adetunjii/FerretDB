@@ -15,9 +15,13 @@
 package backends
 
 import (
+	"cmp"
 	"context"
+	"slices"
+	"time"
 
 	"github.com/FerretDB/FerretDB/internal/types"
+	"github.com/FerretDB/FerretDB/internal/util/must"
 	"github.com/FerretDB/FerretDB/internal/util/observability"
 )
 
@@ -67,10 +71,20 @@ func CollectionContract(c Collection) Collection {
 	}
 }
 
+// SortField consists of a field name and a sort order that are used in queries.
+type SortField struct {
+	Key        string
+	Descending bool
+}
+
 // QueryParams represents the parameters of Collection.Query method.
 type QueryParams struct {
 	// TODO https://github.com/FerretDB/FerretDB/issues/3235
-	Filter *types.Document
+	Filter        *types.Document
+	Sort          *SortField
+	Limit         int64  // if 0 no limit pushdown is applied
+	OnlyRecordIDs bool   // TODO https://github.com/FerretDB/FerretDB/issues/3490
+	Comment       string // TODO https://github.com/FerretDB/FerretDB/issues/3573
 }
 
 // QueryResult represents the results of Collection.Query method.
@@ -115,7 +129,9 @@ type InsertAllResult struct{}
 func (cc *collectionContract) InsertAll(ctx context.Context, params *InsertAllParams) (*InsertAllResult, error) {
 	defer observability.FuncCall(ctx)()
 
+	now := time.Now()
 	for _, doc := range params.Docs {
+		doc.SetRecordID(types.NextTimestamp(now))
 		doc.Freeze()
 	}
 
@@ -160,7 +176,8 @@ func (cc *collectionContract) UpdateAll(ctx context.Context, params *UpdateAllPa
 
 // DeleteAllParams represents the parameters of Collection.Delete method.
 type DeleteAllParams struct {
-	IDs []any
+	IDs       []any
+	RecordIDs []types.Timestamp
 }
 
 // DeleteAllResult represents the results of Collection.Delete method.
@@ -180,6 +197,8 @@ type DeleteAllResult struct {
 func (cc *collectionContract) DeleteAll(ctx context.Context, params *DeleteAllParams) (*DeleteAllResult, error) {
 	defer observability.FuncCall(ctx)()
 
+	must.BeTrue((params.IDs == nil) != (params.RecordIDs == nil))
+
 	res, err := cc.c.DeleteAll(ctx, params)
 	checkError(err)
 
@@ -190,6 +209,8 @@ func (cc *collectionContract) DeleteAll(ctx context.Context, params *DeleteAllPa
 type ExplainParams struct {
 	// TODO https://github.com/FerretDB/FerretDB/issues/3235
 	Filter *types.Document
+	Sort   *SortField
+	Limit  int64 // if 0 no limit pushdown is applied
 }
 
 // ExplainResult represents the results of Collection.Explain method.
@@ -197,11 +218,14 @@ type ExplainResult struct {
 	QueryPlanner *types.Document
 	// TODO https://github.com/FerretDB/FerretDB/issues/3235
 	QueryPushdown bool
+	SortPushdown  bool
+	LimitPushdown bool
 }
 
 // Explain return a backend-specific execution plan for the given query.
 //
-// Database or collection may not exist; that's not an error.
+// Database or collection may not exist; that's not an error, it still
+// returns the ExplainResult with QueryPlanner.
 func (cc *collectionContract) Explain(ctx context.Context, params *ExplainParams) (*ExplainResult, error) {
 	defer observability.FuncCall(ctx)()
 
@@ -212,25 +236,35 @@ func (cc *collectionContract) Explain(ctx context.Context, params *ExplainParams
 }
 
 // CollectionStatsParams represents the parameters of Collection.Stats method.
-type CollectionStatsParams struct{}
-
-// CollectionStatsResult represents the results of Collection.Stats method.
-//
-// TODO https://github.com/FerretDB/FerretDB/issues/2447
-type CollectionStatsResult struct {
-	CountObjects   int64
-	CountIndexes   int64
-	SizeTotal      int64
-	SizeIndexes    int64
-	SizeCollection int64
+type CollectionStatsParams struct {
+	Refresh bool
 }
 
-// Stats returns statistics about the collection.
+// CollectionStatsResult represents the results of Collection.Stats method.
+type CollectionStatsResult struct {
+	CountDocuments  int64
+	SizeTotal       int64
+	SizeIndexes     int64
+	SizeCollection  int64
+	SizeFreeStorage int64
+	IndexSizes      []IndexSize
+}
+
+// IndexSize represents the name and the size of an index.
+type IndexSize struct {
+	Name string
+	Size int64
+}
+
+// Stats returns statistic estimations about the collection.
+// All returned values are not exact, but might be more accurate when Stats is called with `Refresh: true`.
+//
+// The errors for non-existing database and non-existing collection are the same.
 func (cc *collectionContract) Stats(ctx context.Context, params *CollectionStatsParams) (*CollectionStatsResult, error) {
 	defer observability.FuncCall(ctx)()
 
 	res, err := cc.c.Stats(ctx, params)
-	checkError(err, ErrorCodeDatabaseDoesNotExist, ErrorCodeCollectionDoesNotExist)
+	checkError(err, ErrorCodeCollectionDoesNotExist)
 
 	return res, err
 }
@@ -278,7 +312,7 @@ type IndexKeyPair struct {
 	Descending bool
 }
 
-// ListIndexes returns information about indexes in the database.
+// ListIndexes returns a list of collection indexes.
 //
 // The errors for non-existing database and non-existing collection are the same.
 func (cc *collectionContract) ListIndexes(ctx context.Context, params *ListIndexesParams) (*ListIndexesResult, error) {
@@ -286,6 +320,12 @@ func (cc *collectionContract) ListIndexes(ctx context.Context, params *ListIndex
 
 	res, err := cc.c.ListIndexes(ctx, params)
 	checkError(err, ErrorCodeCollectionDoesNotExist)
+
+	if res != nil && len(res.Indexes) > 0 {
+		must.BeTrue(slices.IsSortedFunc(res.Indexes, func(a, b IndexInfo) int {
+			return cmp.Compare(a.Name, b.Name)
+		}))
+	}
 
 	return res, err
 }

@@ -20,37 +20,39 @@ import (
 	"github.com/FerretDB/FerretDB/internal/handlers/sqlite"
 )
 
-// init registers "pg" handler.
+// init registers "postgresql" handler.
 func init() {
-	registry["pg"] = func(opts *NewHandlerOpts) (handlers.Interface, error) {
-		if opts.UseNewPG {
-			handlerOpts := &sqlite.NewOpts{
-				Backend: "postgresql",
-				URI:     opts.PostgreSQLURL,
+	registry["postgresql"] = func(opts *NewHandlerOpts) (handlers.Interface, error) {
+		if opts.UseOldPG {
+			opts.Logger.Warn("Old PostgreSQL handler is deprecated and will be removed in the next release.")
 
-				L:             opts.Logger.Named("postgresql"),
+			handlerOpts := &pg.NewOpts{
+				PostgreSQLURL: opts.PostgreSQLURL,
+
+				L:             opts.Logger,
 				ConnMetrics:   opts.ConnMetrics,
 				StateProvider: opts.StateProvider,
 
 				DisableFilterPushdown: opts.DisableFilterPushdown,
 				EnableSortPushdown:    opts.EnableSortPushdown,
-				EnableOplog:           opts.EnableOplog,
 			}
 
-			return sqlite.New(handlerOpts)
+			return pg.New(handlerOpts)
 		}
 
-		handlerOpts := &pg.NewOpts{
-			PostgreSQLURL: opts.PostgreSQLURL,
+		handlerOpts := &sqlite.NewOpts{
+			Backend: "postgresql",
+			URI:     opts.PostgreSQLURL,
 
-			L:             opts.Logger,
+			L:             opts.Logger.Named("postgresql"),
 			ConnMetrics:   opts.ConnMetrics,
 			StateProvider: opts.StateProvider,
 
 			DisableFilterPushdown: opts.DisableFilterPushdown,
 			EnableSortPushdown:    opts.EnableSortPushdown,
+			EnableOplog:           opts.EnableOplog,
 		}
 
-		return pg.New(handlerOpts)
+		return sqlite.New(handlerOpts)
 	}
 }

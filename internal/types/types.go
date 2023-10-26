@@ -54,6 +54,7 @@ package types
 
 import (
 	"fmt"
+	"maps"
 	"time"
 )
 
@@ -79,7 +80,6 @@ type Type interface {
 }
 
 // CompositeTypeInterface consists of Document and Array.
-// TODO remove once we have go-sumtype equivalent?
 type CompositeTypeInterface interface {
 	CompositeType
 
@@ -138,6 +138,7 @@ func deepCopy(value any) any {
 
 		return &Document{
 			fields:   fields,
+			keys:     maps.Clone(value.keys),
 			recordID: value.recordID,
 		}
 
