@@ -12,16 +12,44 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package pg
+package testdata
 
-import (
-	"context"
+import "testing"
 
-	"github.com/FerretDB/FerretDB/internal/handlers/commoncommands"
-	"github.com/FerretDB/FerretDB/internal/wire"
-)
+func TestNormal1(t *testing.T) {
+	t.Log("hidden")
 
-// MsgWhatsMyURI implements HandlerInterface.
-func (h *Handler) MsgWhatsMyURI(ctx context.Context, msg *wire.OpMsg) (*wire.OpMsg, error) {
-	return commoncommands.MsgWhatsMyURI(ctx, msg)
+	t.Run("Parallel", func(t *testing.T) {
+		t.Log("hidden")
+
+		t.Parallel()
+
+		t.Log("hidden")
+	})
+
+	t.Run("NotParallel", func(t *testing.T) {
+		t.Log("hidden")
+	})
+
+	t.Log("hidden")
+}
+
+func TestNormal2(t *testing.T) {
+	t.Log("hidden")
+
+	t.Parallel()
+
+	t.Log("hidden")
+
+	t.Run("NotParallel", func(t *testing.T) {
+		t.Log("hidden")
+	})
+
+	t.Run("Parallel", func(t *testing.T) {
+		t.Log("hidden")
+
+		t.Parallel()
+
+		t.Log("hidden")
+	})
 }

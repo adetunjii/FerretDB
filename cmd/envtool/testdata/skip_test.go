@@ -12,16 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package pg
+package testdata
 
-import (
-	"context"
+import "testing"
 
-	"github.com/FerretDB/FerretDB/internal/handlers/common"
-	"github.com/FerretDB/FerretDB/internal/wire"
-)
+func TestSkip1(t *testing.T) {
+	t.Log("not hidden 1")
 
-// MsgSetFreeMonitoring implements HandlerInterface.
-func (h *Handler) MsgSetFreeMonitoring(ctx context.Context, msg *wire.OpMsg) (*wire.OpMsg, error) {
-	return common.SetFreeMonitoring(ctx, msg, h.StateProvider)
+	t.Skip("Skip 1")
+
+	t.Log("not run")
 }

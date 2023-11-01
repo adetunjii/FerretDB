@@ -12,16 +12,38 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package pg
+package testdata
 
-import (
-	"context"
+import "testing"
 
-	"github.com/FerretDB/FerretDB/internal/handlers/common"
-	"github.com/FerretDB/FerretDB/internal/wire"
-)
+func TestError1(t *testing.T) {
+	t.Log("not hidden 1")
 
-// MsgGetParameter implements HandlerInterface.
-func (h *Handler) MsgGetParameter(ctx context.Context, msg *wire.OpMsg) (*wire.OpMsg, error) {
-	return common.GetParameter(ctx, msg, h.L)
+	t.Error("Error 1")
+
+	t.Log("not hidden 2")
+}
+
+func TestError2(t *testing.T) {
+	t.Log("not hidden 3")
+
+	t.Parallel()
+
+	t.Log("not hidden 4")
+
+	t.Run("Parallel", func(t *testing.T) {
+		t.Log("not hidden 5")
+
+		t.Parallel()
+
+		t.Log("not hidden 6")
+
+		t.Error("Error 2")
+
+		t.Log("not hidden 7")
+	})
+
+	t.Run("NotParallel", func(t *testing.T) {
+		t.Log("not hidden for parent")
+	})
 }
